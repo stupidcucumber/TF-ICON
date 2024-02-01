@@ -1,11 +1,9 @@
 import argparse, os
-import PIL
 import torch
 import re
 import numpy as np
 from omegaconf import OmegaConf
 from PIL import Image
-from itertools import islice
 from einops import rearrange, repeat
 from torch import autocast
 from contextlib import nullcontext
@@ -90,7 +88,7 @@ def main():
         file_name = "same_domain"
     else:
         raise ValueError("Invalid domain")
-        
+
     batch_size = opt.n_samples
     sample_path = os.path.join(outpath, file_name)
     os.makedirs(sample_path, exist_ok=True)

@@ -3,12 +3,15 @@ import importlib
 import torch
 from torch import optim
 import numpy as np
+from itertools import islice
+import cv2
+import PIL
 
 from inspect import isfunction
 from PIL import Image, ImageDraw, ImageFont
 
 
-def load_model_and_get_prompt_embedding(model, opt, device, prompts, inv=False):
+def load_model_and_get_prompt_embedding(model, opt, prompts, inv=False):
            
     if inv:
         inv_emb = model.get_learned_conditioning(prompts, inv)
