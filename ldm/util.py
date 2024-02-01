@@ -8,6 +8,104 @@ from inspect import isfunction
 from PIL import Image, ImageDraw, ImageFont
 
 
+def load_model_and_get_prompt_embedding(model, opt, device, prompts, inv=False):
+           
+    if inv:
+        inv_emb = model.get_learned_conditioning(prompts, inv)
+        c = uc = inv_emb
+    else:
+        inv_emb = None
+        
+    if opt.scale != 1.0:
+        uc = model.get_learned_conditioning(opt.n_samples * [""])
+    else:
+        uc = None
+    c = model.get_learned_conditioning(prompts)
+        
+    return c, uc, inv_emb
+    
+    
+def chunk(it, size):
+    it = iter(it)
+    return iter(lambda: tuple(islice(it, size)), ())
+
+
+def load_model_from_config(config, ckpt, gpu, verbose=False):
+    print(f"Loading model from {ckpt}")
+    pl_sd = torch.load(ckpt, map_location=gpu)
+    if "global_step" in pl_sd:
+        print(f"Global Step: {pl_sd['global_step']}")
+    sd = pl_sd["state_dict"]
+    model = instantiate_from_config(config.model)
+    m, u = model.load_state_dict(sd, strict=False)
+    if len(m) > 0 and verbose:
+        print("missing keys:")
+        print(m)
+    if len(u) > 0 and verbose:
+        print("unexpected keys:")
+        print(u)
+
+    # model.cuda()
+    model.eval()
+    return model
+
+
+def load_img(path, SCALE, pad=False, seg=False, target_size=None):
+    if seg:
+        # Load the input image and segmentation map
+        image = Image.open(path).convert("RGB")
+        seg_map = Image.open(seg).convert("1")
+
+        # Get the width and height of the original image
+        w, h = image.size
+
+        # Calculate the aspect ratio of the original image
+        aspect_ratio = h / w
+
+        # Determine the new dimensions for resizing the image while maintaining aspect ratio
+        if aspect_ratio > 1:
+            new_w = int(SCALE * 256 / aspect_ratio)
+            new_h = int(SCALE * 256)
+        else:
+            new_w = int(SCALE * 256)
+            new_h = int(SCALE * 256 * aspect_ratio)
+
+        # Resize the image and the segmentation map to the new dimensions
+        image_resize = image.resize((new_w, new_h))
+        segmentation_map_resize = cv2.resize(np.array(seg_map).astype(np.uint8), (new_w, new_h), interpolation=cv2.INTER_NEAREST)
+
+        # Pad the segmentation map to match the target size
+        padded_segmentation_map = np.zeros((target_size[1], target_size[0]))
+        start_x = (target_size[1] - segmentation_map_resize.shape[0]) // 2
+        start_y = (target_size[0] - segmentation_map_resize.shape[1]) // 2
+        padded_segmentation_map[start_x: start_x + segmentation_map_resize.shape[0], start_y: start_y + segmentation_map_resize.shape[1]] = segmentation_map_resize
+
+        # Create a new RGB image with the target size and place the resized image in the center
+        padded_image = Image.new("RGB", target_size)
+        start_x = (target_size[0] - image_resize.width) // 2
+        start_y = (target_size[1] - image_resize.height) // 2
+        padded_image.paste(image_resize, (start_x, start_y))
+
+        # Update the variable "image" to contain the final padded image
+        image = padded_image
+    else:
+        image = Image.open(path).convert("RGB")
+        w, h = image.size        
+        print(f"loaded input image of size ({w}, {h}) from {path}")
+        w, h = map(lambda x: x - x % 64, (w, h))  # resize to integer multiple of 64
+        w = h = 512
+        image = image.resize((w, h), resample=PIL.Image.LANCZOS)
+        
+    image = np.array(image).astype(np.float32) / 255.0
+    image = image[None].transpose(0, 3, 1, 2)
+    image = torch.from_numpy(image)
+    
+    if pad or seg:
+        return 2. * image - 1., new_w, new_h, padded_segmentation_map
+    
+    return 2. * image - 1., w, h 
+
+
 def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)
     # xc a list of captions to plot

@@ -12,264 +12,70 @@ from contextlib import nullcontext
 from pytorch_lightning import seed_everything
 import cv2
 import time
-from ldm.util import instantiate_from_config
+from ldm.util import instantiate_from_config, load_img, load_model_and_get_prompt_embedding, load_model_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.dpm_solver import DPMSolverSampler
 
 
-def load_img(path, SCALE, pad=False, seg=False, target_size=None):
-    if seg:
-        # Load the input image and segmentation map
-        image = Image.open(path).convert("RGB")
-        seg_map = Image.open(seg).convert("1")
+def parse_arguments():
+    parser = argparse.ArgumentParser()
 
-        # Get the width and height of the original image
-        w, h = image.size
+    parser.add_argument("--prompt", type=str, nargs="?", 
+                        default="a professional photograph of a doggy, ultra realistic",
+                        help="the prompt to render"
+                        )
 
-        # Calculate the aspect ratio of the original image
-        aspect_ratio = h / w
+    parser.add_argument("--init-img", type=str, nargs="?", help="path to the input image")
 
-        # Determine the new dimensions for resizing the image while maintaining aspect ratio
-        if aspect_ratio > 1:
-            new_w = int(SCALE * 256 / aspect_ratio)
-            new_h = int(SCALE * 256)
-        else:
-            new_w = int(SCALE * 256)
-            new_h = int(SCALE * 256 * aspect_ratio)
-
-        # Resize the image and the segmentation map to the new dimensions
-        image_resize = image.resize((new_w, new_h))
-        segmentation_map_resize = cv2.resize(np.array(seg_map).astype(np.uint8), (new_w, new_h), interpolation=cv2.INTER_NEAREST)
-
-        # Pad the segmentation map to match the target size
-        padded_segmentation_map = np.zeros((target_size[1], target_size[0]))
-        start_x = (target_size[1] - segmentation_map_resize.shape[0]) // 2
-        start_y = (target_size[0] - segmentation_map_resize.shape[1]) // 2
-        padded_segmentation_map[start_x: start_x + segmentation_map_resize.shape[0], start_y: start_y + segmentation_map_resize.shape[1]] = segmentation_map_resize
-
-        # Create a new RGB image with the target size and place the resized image in the center
-        padded_image = Image.new("RGB", target_size)
-        start_x = (target_size[0] - image_resize.width) // 2
-        start_y = (target_size[1] - image_resize.height) // 2
-        padded_image.paste(image_resize, (start_x, start_y))
-
-        # Update the variable "image" to contain the final padded image
-        image = padded_image
-    else:
-        image = Image.open(path).convert("RGB")
-        w, h = image.size        
-        print(f"loaded input image of size ({w}, {h}) from {path}")
-        w, h = map(lambda x: x - x % 64, (w, h))  # resize to integer multiple of 64
-        w = h = 512
-        image = image.resize((w, h), resample=PIL.Image.LANCZOS)
+    parser.add_argument("--ref-img", type=list, nargs="?", help="path to the input image")
+    
+    parser.add_argument("--seg", type=str, nargs="?", help="path to the input image")
         
-    image = np.array(image).astype(np.float32) / 255.0
-    image = image[None].transpose(0, 3, 1, 2)
-    image = torch.from_numpy(image)
+    parser.add_argument("--outdir", type=str, nargs="?", help="dir to write results to", default="./outputs")
+
+    parser.add_argument("--dpm_steps", type=int, default=20, help="number of ddim sampling steps")
+
+    parser.add_argument("--ddim_eta", type=float, default=0.0, help="ddim eta (eta=0.0 corresponds to deterministic sampling")
+
+    parser.add_argument("--C", type=int, default=4, help="latent channels")
     
-    if pad or seg:
-        return 2. * image - 1., new_w, new_h, padded_segmentation_map
+    parser.add_argument("--f", type=int, default=16, help="downsampling factor, most often 8 or 16")
+
+    parser.add_argument("--n_samples", type=int, default=1, 
+                        help="how many samples to produce for each given prompt. A.k.a batch size")
+
+    parser.add_argument("--scale", type=float, default=2.5, 
+                        help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))")
     
-    return 2. * image - 1., w, h 
-
-
-def load_model_and_get_prompt_embedding(model, opt, device, prompts, inv=False):
-           
-    if inv:
-        inv_emb = model.get_learned_conditioning(prompts, inv)
-        c = uc = inv_emb
-    else:
-        inv_emb = None
-        
-    if opt.scale != 1.0:
-        uc = model.get_learned_conditioning(opt.n_samples * [""])
-    else:
-        uc = None
-    c = model.get_learned_conditioning(prompts)
-        
-    return c, uc, inv_emb
+    parser.add_argument("--config", type=str, default="./configs/stable-diffusion/v2-inference.yaml",
+                        help="path to config which constructs model")
     
+    parser.add_argument("--ckpt", type=str, default="./ckpt/v2-1_512-ema-pruned.ckpt", help="path to checkpoint of model")
     
-def chunk(it, size):
-    it = iter(it)
-    return iter(lambda: tuple(islice(it, size)), ())
+    parser.add_argument("--seed", type=int, default=3407, help="the seed (for reproducible sampling)")
+    
+    parser.add_argument("--precision", type=str, help="evaluate at this precision", choices=["full", "autocast"], default="autocast")
+    
+    parser.add_argument("--root", type=str, help="", default='./inputs/cross_domain') 
+    
+    parser.add_argument("--domain", type=str, help="", default='cross') 
+    
+    parser.add_argument("--dpm_order", type=int, help="", choices=[1, 2, 3], default=2) 
+    
+    parser.add_argument("--tau_a", type=float, help="", default=0.4)
+      
+    parser.add_argument("--tau_b", type=float, help="", default=0.8)
+          
+    parser.add_argument("--gpu", type=str, help="", default='cuda:0') 
+    
+    opt = parser.parse_args()
 
-
-def load_model_from_config(config, ckpt, gpu, verbose=False):
-    print(f"Loading model from {ckpt}")
-    pl_sd = torch.load(ckpt, map_location=gpu)
-    if "global_step" in pl_sd:
-        print(f"Global Step: {pl_sd['global_step']}")
-    sd = pl_sd["state_dict"]
-    model = instantiate_from_config(config.model)
-    m, u = model.load_state_dict(sd, strict=False)
-    if len(m) > 0 and verbose:
-        print("missing keys:")
-        print(m)
-    if len(u) > 0 and verbose:
-        print("unexpected keys:")
-        print(u)
-
-    # model.cuda()
-    model.eval()
-    return model
+    return opt
 
 
 def main():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--prompt",
-        type=str,
-        nargs="?",
-        default="a professional photograph of a doggy, ultra realistic",
-        help="the prompt to render"
-    )
-
-    parser.add_argument(
-        "--init-img",
-        type=str,
-        nargs="?",
-        help="path to the input image"
-    )
-
-    parser.add_argument(
-        "--ref-img",
-        type=list,
-        nargs="?",
-        help="path to the input image"
-    )
-    
-    parser.add_argument(
-        "--seg",
-        type=str,
-        nargs="?",
-        help="path to the input image"
-    )
-        
-    parser.add_argument(
-        "--outdir",
-        type=str,
-        nargs="?",
-        help="dir to write results to",
-        default="./outputs"
-    )
-
-    parser.add_argument(
-        "--dpm_steps",
-        type=int,
-        default=20,
-        help="number of ddim sampling steps",
-    )
-
-    parser.add_argument(
-        "--ddim_eta",
-        type=float,
-        default=0.0,
-        help="ddim eta (eta=0.0 corresponds to deterministic sampling",
-    )
-
-    parser.add_argument(
-        "--C",
-        type=int,
-        default=4,
-        help="latent channels",
-    )
-    
-    parser.add_argument(
-        "--f",
-        type=int,
-        default=16,
-        help="downsampling factor, most often 8 or 16",
-    )
-
-    parser.add_argument(
-        "--n_samples",
-        type=int,
-        default=1,
-        help="how many samples to produce for each given prompt. A.k.a batch size",
-    )
-
-    parser.add_argument(
-        "--scale",
-        type=float,
-        default=2.5,
-        help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))",
-    )
-    
-    parser.add_argument(
-        "--config",
-        type=str,
-        default="./configs/stable-diffusion/v2-inference.yaml",
-        help="path to config which constructs model",
-    )
-    
-    parser.add_argument(
-        "--ckpt",
-        type=str,
-        default="./ckpt/v2-1_512-ema-pruned.ckpt",
-        help="path to checkpoint of model",
-    )
-    
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=3407,
-        help="the seed (for reproducible sampling)",
-    )
-    
-    parser.add_argument(
-        "--precision",
-        type=str,
-        help="evaluate at this precision",
-        choices=["full", "autocast"],
-        default="autocast"
-    )
-    
-    parser.add_argument(
-        "--root",
-        type=str,
-        help="",
-        default='./inputs/cross_domain'
-    ) 
-    
-    parser.add_argument(
-        "--domain",
-        type=str,
-        help="",
-        default='cross'
-    ) 
-    
-    parser.add_argument(
-        "--dpm_order",
-        type=int,
-        help="",
-        choices=[1, 2, 3],
-        default=2
-    ) 
-    
-    parser.add_argument(
-        "--tau_a",
-        type=float,
-        help="",
-        default=0.4
-    )
-      
-    parser.add_argument(
-        "--tau_b",
-        type=float,
-        help="",
-        default=0.8
-    )
-          
-    parser.add_argument(
-        "--gpu",
-        type=str,
-        help="",
-        default='cuda:0'
-    ) 
-    
-    opt = parser.parse_args()       
+    opt = parse_arguments()
+     
     device = torch.device(opt.gpu) if torch.cuda.is_available() else torch.device("cpu")
 
     os.makedirs(opt.outdir, exist_ok=True)
@@ -383,8 +189,6 @@ def main():
                 save_mask = torch.zeros_like(init_image) 
                 save_mask[:, :, center_row_rm - step_height1:center_row_rm + step_height2, center_col_rm - step_width1:center_col_rm + step_width2] = 1
 
-                # image = Image.fromarray(((save_mask) * 255)[0].permute(1,2,0).to(dtype=torch.uint8).cpu().numpy())
-                # image.save('./outputs/mask_bg_fg.jpg')
                 image = Image.fromarray(((save_image/torch.max(save_image.max(), abs(save_image.min())) + 1) * 127.5)[0].permute(1,2,0).to(dtype=torch.uint8).cpu().numpy())
                 image.save('./outputs/cp_bg_fg.jpg')
 
