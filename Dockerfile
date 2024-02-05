@@ -1,10 +1,11 @@
-FROM python
+FROM python:3.10-bullseye
 
 WORKDIR /app
 ADD requirements.txt ./
+RUN pip3 install --no-cache -r requirements.txt
 
 COPY . ./
-CMD ["python", "scripts/main_tf_icon.py", "--ckpt", "<path/to/model.ckpt/>", \
+CMD ["python3", "scripts/main_tf_icon.py", "--ckpt", "<path/to/model.ckpt/>", \
                                 "--root", "./inputs/same_domain",            \
                                 "--domain", "same",                          \
                                 "--dpm_steps", "20",                         \
