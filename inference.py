@@ -13,6 +13,7 @@ import time
 from ldm.util import instantiate_from_config, load_img, load_model_and_get_prompt_embedding, load_model_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.dpm_solver import DPMSolverSampler
+from huggingface_hub import hf_hub_download
 
 
 def parse_arguments():
@@ -73,11 +74,16 @@ def parse_arguments():
 
 def main():
     opt = parse_arguments()
+    output_folder = 'outputs'
+
+    if not os.path.exists(output_folder):
+        os.mkdir(output_folder)
+
+    hf_hub_download(repo_id="stabilityai/stable-diffusion-2-1-base", 
+                    local_dir='ckpt', 
+                    filename="v2-1_512-ema-pruned.ckpt")
      
     device = torch.device(opt.gpu) if torch.cuda.is_available() else torch.device("cpu")
-
-    os.makedirs(opt.outdir, exist_ok=True)
-    outpath = opt.outdir
 
     # The scale used in the paper
     if opt.domain == 'cross':
@@ -90,7 +96,7 @@ def main():
         raise ValueError("Invalid domain")
 
     batch_size = opt.n_samples
-    sample_path = os.path.join(outpath, file_name)
+    sample_path = os.path.join(output_folder, file_name)
     os.makedirs(sample_path, exist_ok=True)
     base_count = len(os.listdir(sample_path))
 

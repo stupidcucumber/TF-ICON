@@ -1,0 +1,11 @@
+torch
+huggingface_hub
+numpy
+pandas
+pytorch_lightning 
+omegaconf
+open_clip_torch 
+einops 
+diffusers
+Pillow
+opencv-python
