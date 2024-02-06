@@ -5,14 +5,13 @@ services:
       - "8000:8000"
     volumes:
       - outputs:/app/outputs
-
-deploy:
-  resources:
-    reservations:
-      devices:
-        - driver: nvidia
-          count: 1
-          capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 volumes:
   outputs:
