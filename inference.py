@@ -73,6 +73,7 @@ def parse_arguments():
 
 
 def main():
+    print('Welcome to the inference script! In a moment we will start...')
     opt = parse_arguments()
     output_folder = 'outputs'
 
@@ -109,6 +110,7 @@ def main():
         for file in files:
             torch.cuda.empty_cache()
             file_path = os.path.join(subdir, file)
+            print('Start processing file: ',file_path)
             result = re.search(r'./inputs/[^/]+/(.+)/bg\d+\.', file_path)
             if result:
                 prompt = result.group(1)
@@ -195,10 +197,12 @@ def main():
 
                 image = Image.fromarray(((save_image/torch.max(save_image.max(), abs(save_image.min())) + 1) * 127.5)[0].permute(1,2,0).to(dtype=torch.uint8).cpu().numpy())
                 image.save('./outputs/cp_bg_fg.jpg')
+                print('Saved pre-processed image.')
 
                 precision_scope = autocast if opt.precision == "autocast" else nullcontext
                 
                 # image composition
+                print('Starting image composition...')
                 with torch.no_grad():
                     with precision_scope("cuda"):
                         for prompts in data:
