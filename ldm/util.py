@@ -11,7 +11,7 @@ from inspect import isfunction
 from PIL import Image, ImageDraw, ImageFont
 
 
-def load_model_and_get_prompt_embedding(model, opt, prompts, inv=False):
+def load_model_and_get_prompt_embedding(model, opt, prompts, inv: bool=True):
            
     if inv:
         inv_emb = model.get_learned_conditioning(prompts, inv)

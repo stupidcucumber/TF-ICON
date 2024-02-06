@@ -207,7 +207,7 @@ def main():
                     with precision_scope("cuda"):
                         for prompts in data:
                             print(prompts)
-                            c, uc, inv_emb = load_model_and_get_prompt_embedding(model, opt, device, prompts, inv=True)
+                            c, uc, inv_emb = load_model_and_get_prompt_embedding(model, opt, prompts, inv=True)
                             
                             if opt.domain == 'same': # same domain
                                 init_image = save_image
