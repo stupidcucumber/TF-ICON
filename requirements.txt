@@ -11,3 +11,8 @@ diffusers
 Pillow
 opencv-python
 ipython
+transformers
+diffusers
+tqdm
+albumentations
+scipy
