@@ -2,6 +2,7 @@ torch
 huggingface_hub
 numpy
 pandas
+matplotlib
 pytorch_lightning 
 omegaconf
 open_clip_torch 
@@ -9,3 +10,4 @@ einops
 diffusers
 Pillow
 opencv-python
+ipython
