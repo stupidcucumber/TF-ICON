@@ -343,7 +343,7 @@ def main():
                 
                 path = os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png")
                 print('Saving the final file: ', path)
-                img.save()
+                img.save(path)
 
                 del x_samples, samples, z_enc, z_ref_enc, samples_orig, samples_for_cross, samples_ref, mask, x_sample, img, c, uc, inv_emb
                 del param, segmentation_map, top_rr, bottom_rr, left_rr, right_rr, target_height, target_width, center_row_rm, center_col_rm
