@@ -332,18 +332,18 @@ def main():
                                 T2 = time.time()
                                 print('Running Time: %s s' % ((T2 - T1)))
                                 
-                                for index, x_sample in enumerate(x_samples):
+                                for x_sample in x_samples:
                                     x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
                                     img = Image.fromarray(x_sample.astype(np.uint8))
-                                    if index == len(x_samples) - 1:
-                                        path = os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png")
-                                        print('Saving the final file: ', path)
-                                        img.save(path)
-                                    else: 
-                                        path = os.path.join(subdir, '%s' % opt.init_img.split('/')[-1])
-                                        print('Path to the sample: ', path)
-                                        img.save(path)
+
+                                    path = os.path.join(subdir, '%s' % opt.init_img.split('/')[-1])
+                                    print('Path to the sample: ', path)
+                                    img.save(path)
                                     base_count += 1
+                
+                path = os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png")
+                print('Saving the final file: ', path)
+                img.save()
 
                 del x_samples, samples, z_enc, z_ref_enc, samples_orig, samples_for_cross, samples_ref, mask, x_sample, img, c, uc, inv_emb
                 del param, segmentation_map, top_rr, bottom_rr, left_rr, right_rr, target_height, target_width, center_row_rm, center_col_rm
