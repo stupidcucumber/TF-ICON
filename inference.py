@@ -75,6 +75,7 @@ def parse_arguments():
 def main():
     print('Welcome to the inference script! In a moment we will start...')
     opt = parse_arguments()
+    opt.mask = []
     output_folder = 'outputs'
 
     if not os.path.exists(output_folder):
@@ -121,142 +122,128 @@ def main():
                 elif file.startswith('fg') and not (file.endswith('mask.jpg') or file.endswith('mask.png')):
                     opt.ref_img = file_path
                 elif file.startswith('mask'):
-                    opt.mask = file_path
+                    opt.mask.append(file_path)
                 elif file.startswith('fg') and (file.endswith('mask.jpg') or file.endswith('mask.png')):
                     opt.seg = file_path
                     
             if file == files[-1]:
                 seed_everything(opt.seed)
-                img = cv2.imread(opt.mask, 0)
-                # Threshold the image to create binary image
-                _, binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
-                # Find the contours of the white region in the image
-                contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                # Find the bounding rectangle of the largest contour
-                x, y, new_w, new_h = cv2.boundingRect(contours[0])
-                # Calculate the center of the rectangle
-                center_x = x + new_w / 2
-                center_y = y + new_h / 2
-                # Calculate the percentage from the top and left
-                center_row_from_top = round(center_y / 512, 2)
-                center_col_from_left = round(center_x / 512, 2)
 
-                aspect_ratio = new_h / new_w
-                
-                if aspect_ratio > 1:  
-                    scale = new_w * aspect_ratio / 256  
-                    scale = new_h / 256
-                else:  
-                    scale = new_w / 256
-                    scale = new_h / (aspect_ratio * 256) 
-                     
-                scale = round(scale, 2)
-                
-                # =============================================================================================
-        
-                assert prompt is not None
-                data = [batch_size * [prompt]]
-                
-                # read background image              
-                assert os.path.isfile(opt.init_img)
-                init_image, target_width, target_height = load_img(opt.init_img, scale)
-                init_image = repeat(init_image.to(device), '1 ... -> b ...', b=batch_size)
-                save_image = init_image.clone()
+                for mask in opt.mask:
+                    img = cv2.imread(mask, 0)
+                    # Threshold the image to create binary image
+                    _, binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+                    # Find the contours of the white region in the image
+                    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    # Find the bounding rectangle of the largest contour
+                    x, y, new_w, new_h = cv2.boundingRect(contours[0])
+                    # Calculate the center of the rectangle
+                    center_x = x + new_w / 2
+                    center_y = y + new_h / 2
+                    # Calculate the percentage from the top and left
+                    center_row_from_top = round(center_y / 512, 2)
+                    center_col_from_left = round(center_x / 512, 2)
 
-                # read foreground image and its segmentation map
-                ref_image, width, height, segmentation_map  = load_img(opt.ref_img, scale, seg=opt.seg, target_size=(target_width, target_height))
-                ref_image = repeat(ref_image.to(device), '1 ... -> b ...', b=batch_size)
-
-                segmentation_map_orig = repeat(torch.tensor(segmentation_map)[None, None, ...].to(device), '1 1 ... -> b 4 ...', b=batch_size)
-                segmentation_map_save = repeat(torch.tensor(segmentation_map)[None, None, ...].to(device), '1 1 ... -> b 3 ...', b=batch_size)
-                segmentation_map = segmentation_map_orig[:, :, ::8, ::8].to(device)
-
-                top_rr = int((0.5*(target_height - height))/target_height * init_image.shape[2])  # xx% from the top
-                bottom_rr = int((0.5*(target_height + height))/target_height * init_image.shape[2])  
-                left_rr = int((0.5*(target_width - width))/target_width * init_image.shape[3])  # xx% from the left
-                right_rr = int((0.5*(target_width + width))/target_width * init_image.shape[3]) 
-
-                center_row_rm = int(center_row_from_top * target_height)
-                center_col_rm = int(center_col_from_left * target_width)
-
-                step_height2, remainder = divmod(height, 2)
-                step_height1 = step_height2 + remainder
-                step_width2, remainder = divmod(width, 2)
-                step_width1 = step_width2 + remainder
+                    aspect_ratio = new_h / new_w
                     
-                # compositing in pixel space for same-domain composition
-                save_image[:, :, center_row_rm - step_height1:center_row_rm + step_height2, center_col_rm - step_width1:center_col_rm + step_width2] \
-                        = save_image[:, :, center_row_rm - step_height1:center_row_rm + step_height2, center_col_rm - step_width1:center_col_rm + step_width2].clone() \
-                        * (1 - segmentation_map_save[:, :, top_rr:bottom_rr, left_rr:right_rr]) \
-                        + ref_image[:, :, top_rr:bottom_rr, left_rr:right_rr].clone() \
-                        * segmentation_map_save[:, :, top_rr:bottom_rr, left_rr:right_rr]
-
-                # save the mask and the pixel space composited image
-                save_mask = torch.zeros_like(init_image) 
-                save_mask[:, :, center_row_rm - step_height1:center_row_rm + step_height2, center_col_rm - step_width1:center_col_rm + step_width2] = 1
-
-                image = Image.fromarray(((save_image/torch.max(save_image.max(), abs(save_image.min())) + 1) * 127.5)[0].permute(1,2,0).to(dtype=torch.uint8).cpu().numpy())
-                image.save('./outputs/cp_bg_fg.jpg')
-                print('Saved pre-processed image.')
-
-                precision_scope = autocast if opt.precision == "autocast" else nullcontext
-                
-                # image composition
-                print('Starting image composition...')
-                with torch.no_grad():
-                    with precision_scope("cuda"):
-                        for prompts in data:
-                            print(prompts)
-                            c, uc, inv_emb = load_model_and_get_prompt_embedding(model, opt, prompts, inv=True)
-                            
-                            if opt.domain == 'same': # same domain
-                                init_image = save_image
-                            
-                            T1 = time.time()
-                            init_latent = model.get_first_stage_encoding(model.encode_first_stage(init_image))  
-                            
-                            # ref's location in ref image in the latent space
-                            top_rr = int((0.5*(target_height - height))/target_height * init_latent.shape[2])  
-                            bottom_rr = int((0.5*(target_height + height))/target_height * init_latent.shape[2])  
-                            left_rr = int((0.5*(target_width - width))/target_width * init_latent.shape[3])  
-                            right_rr = int((0.5*(target_width + width))/target_width * init_latent.shape[3]) 
-                                                    
-                            new_height = bottom_rr - top_rr
-                            new_width = right_rr - left_rr
-                            
-                            step_height2, remainder = divmod(new_height, 2)
-                            step_height1 = step_height2 + remainder
-                            step_width2, remainder = divmod(new_width, 2)
-                            step_width1 = step_width2 + remainder
-                            
-                            center_row_rm = int(center_row_from_top * init_latent.shape[2])
-                            center_col_rm = int(center_col_from_left * init_latent.shape[3])
-                            
-                            param = [max(0, int(center_row_rm - step_height1)), 
-                                    min(init_latent.shape[2] - 1, int(center_row_rm + step_height2)),
-                                    max(0, int(center_col_rm - step_width1)), 
-                                    min(init_latent.shape[3] - 1, int(center_col_rm + step_width2))]
-                            
-                            ref_latent = model.get_first_stage_encoding(model.encode_first_stage(ref_image))
+                    if aspect_ratio > 1:  
+                        scale = new_w * aspect_ratio / 256  
+                        scale = new_h / 256
+                    else:  
+                        scale = new_w / 256
+                        scale = new_h / (aspect_ratio * 256) 
                         
-                            shape = [init_latent.shape[1], init_latent.shape[2], init_latent.shape[3]]
-                            z_enc, _ = sampler.sample(steps=opt.dpm_steps,
-                                                    inv_emb=inv_emb,
-                                                    unconditional_conditioning=uc,
-                                                    conditioning=c,
-                                                    batch_size=opt.n_samples,
-                                                    shape=shape,
-                                                    verbose=False,
-                                                    unconditional_guidance_scale=opt.scale,
-                                                    eta=opt.ddim_eta,
-                                                    order=opt.dpm_order,
-                                                    x_T=init_latent,
-                                                    width=width,
-                                                    height=height,
-                                                    DPMencode=True,
-                                                    )
+                    scale = round(scale, 2)
+                    
+                    # =============================================================================================
+            
+                    assert prompt is not None
+                    data = [batch_size * [prompt]]
+                    
+                    # read background image              
+                    assert os.path.isfile(opt.init_img)
+                    init_image, target_width, target_height = load_img(opt.init_img, scale)
+                    init_image = repeat(init_image.to(device), '1 ... -> b ...', b=batch_size)
+                    save_image = init_image.clone()
+
+                    # read foreground image and its segmentation map
+                    ref_image, width, height, segmentation_map  = load_img(opt.ref_img, scale, seg=opt.seg, target_size=(target_width, target_height))
+                    ref_image = repeat(ref_image.to(device), '1 ... -> b ...', b=batch_size)
+
+                    segmentation_map_orig = repeat(torch.tensor(segmentation_map)[None, None, ...].to(device), '1 1 ... -> b 4 ...', b=batch_size)
+                    segmentation_map_save = repeat(torch.tensor(segmentation_map)[None, None, ...].to(device), '1 1 ... -> b 3 ...', b=batch_size)
+                    segmentation_map = segmentation_map_orig[:, :, ::8, ::8].to(device)
+
+                    top_rr = int((0.5*(target_height - height))/target_height * init_image.shape[2])  # xx% from the top
+                    bottom_rr = int((0.5*(target_height + height))/target_height * init_image.shape[2])  
+                    left_rr = int((0.5*(target_width - width))/target_width * init_image.shape[3])  # xx% from the left
+                    right_rr = int((0.5*(target_width + width))/target_width * init_image.shape[3]) 
+
+                    center_row_rm = int(center_row_from_top * target_height)
+                    center_col_rm = int(center_col_from_left * target_width)
+
+                    step_height2, remainder = divmod(height, 2)
+                    step_height1 = step_height2 + remainder
+                    step_width2, remainder = divmod(width, 2)
+                    step_width1 = step_width2 + remainder
+                        
+                    # compositing in pixel space for same-domain composition
+                    save_image[:, :, center_row_rm - step_height1:center_row_rm + step_height2, center_col_rm - step_width1:center_col_rm + step_width2] \
+                            = save_image[:, :, center_row_rm - step_height1:center_row_rm + step_height2, center_col_rm - step_width1:center_col_rm + step_width2].clone() \
+                            * (1 - segmentation_map_save[:, :, top_rr:bottom_rr, left_rr:right_rr]) \
+                            + ref_image[:, :, top_rr:bottom_rr, left_rr:right_rr].clone() \
+                            * segmentation_map_save[:, :, top_rr:bottom_rr, left_rr:right_rr]
+
+                    # save the mask and the pixel space composited image
+                    save_mask = torch.zeros_like(init_image) 
+                    save_mask[:, :, center_row_rm - step_height1:center_row_rm + step_height2, center_col_rm - step_width1:center_col_rm + step_width2] = 1
+
+                    image = Image.fromarray(((save_image/torch.max(save_image.max(), abs(save_image.min())) + 1) * 127.5)[0].permute(1,2,0).to(dtype=torch.uint8).cpu().numpy())
+                    image.save('./outputs/cp_bg_fg.jpg')
+                    print('Saved pre-processed image.')
+
+                    precision_scope = autocast if opt.precision == "autocast" else nullcontext
+                    
+                    # image composition
+                    print('Starting image composition...')
+                    with torch.no_grad():
+                        with precision_scope("cuda"):
+                            for prompts in data:
+                                print(prompts)
+                                c, uc, inv_emb = load_model_and_get_prompt_embedding(model, opt, prompts, inv=True)
+                                
+                                if opt.domain == 'same': # same domain
+                                    init_image = save_image
+                                
+                                T1 = time.time()
+                                init_latent = model.get_first_stage_encoding(model.encode_first_stage(init_image))  
+                                
+                                # ref's location in ref image in the latent space
+                                top_rr = int((0.5*(target_height - height))/target_height * init_latent.shape[2])  
+                                bottom_rr = int((0.5*(target_height + height))/target_height * init_latent.shape[2])  
+                                left_rr = int((0.5*(target_width - width))/target_width * init_latent.shape[3])  
+                                right_rr = int((0.5*(target_width + width))/target_width * init_latent.shape[3]) 
+                                                        
+                                new_height = bottom_rr - top_rr
+                                new_width = right_rr - left_rr
+                                
+                                step_height2, remainder = divmod(new_height, 2)
+                                step_height1 = step_height2 + remainder
+                                step_width2, remainder = divmod(new_width, 2)
+                                step_width1 = step_width2 + remainder
+                                
+                                center_row_rm = int(center_row_from_top * init_latent.shape[2])
+                                center_col_rm = int(center_col_from_left * init_latent.shape[3])
+                                
+                                param = [max(0, int(center_row_rm - step_height1)), 
+                                        min(init_latent.shape[2] - 1, int(center_row_rm + step_height2)),
+                                        max(0, int(center_col_rm - step_width1)), 
+                                        min(init_latent.shape[3] - 1, int(center_col_rm + step_width2))]
+                                
+                                ref_latent = model.get_first_stage_encoding(model.encode_first_stage(ref_image))
                             
-                            z_ref_enc, _ = sampler.sample(steps=opt.dpm_steps,
+                                shape = [init_latent.shape[1], init_latent.shape[2], init_latent.shape[3]]
+                                z_enc, _ = sampler.sample(steps=opt.dpm_steps,
                                                         inv_emb=inv_emb,
                                                         unconditional_conditioning=uc,
                                                         conditioning=c,
@@ -266,74 +253,93 @@ def main():
                                                         unconditional_guidance_scale=opt.scale,
                                                         eta=opt.ddim_eta,
                                                         order=opt.dpm_order,
-                                                        x_T=ref_latent,
+                                                        x_T=init_latent,
+                                                        width=width,
+                                                        height=height,
                                                         DPMencode=True,
-                                                        width=width,
-                                                        height=height,
-                                                        ref=True,
-                                                        )
-                            
-                            samples_orig = z_enc.clone()
-
-                            # inpainting in XOR region of M_seg and M_mask
-                            z_enc[:, :, param[0]:param[1], param[2]:param[3]] \
-                                = z_enc[:, :, param[0]:param[1], param[2]:param[3]] \
-                                * segmentation_map[:, :, top_rr:bottom_rr, left_rr:right_rr] \
-                                + torch.randn((1, 4, bottom_rr - top_rr, right_rr - left_rr), device=device) \
-                                * (1 - segmentation_map[:, :, top_rr:bottom_rr, left_rr:right_rr])
-
-                            samples_for_cross = samples_orig.clone()
-                            samples_ref = z_ref_enc.clone()
-                            samples = z_enc.clone()
-
-                            # noise composition
-                            if opt.domain == 'cross': 
-                                samples[:, :, param[0]:param[1], param[2]:param[3]] = torch.randn((1, 4, bottom_rr - top_rr, right_rr - left_rr), device=device) 
-                                # apply the segmentation mask on the noise
-                                samples[:, :, param[0]:param[1], param[2]:param[3]] \
-                                        = samples[:, :, param[0]:param[1], param[2]:param[3]].clone() \
-                                        * (1 - segmentation_map[:, :, top_rr: bottom_rr, left_rr: right_rr]) \
-                                        + z_ref_enc[:, :, top_rr: bottom_rr, left_rr: right_rr].clone() \
-                                        * segmentation_map[:, :, top_rr: bottom_rr, left_rr: right_rr]
-                            
-                            mask = torch.zeros_like(z_enc, device=device)
-                            mask[:, :, param[0]:param[1], param[2]:param[3]] = 1
-                                                
-                            samples, _ = sampler.sample(steps=opt.dpm_steps,
-                                                        inv_emb=inv_emb,
-                                                        conditioning=c,
-                                                        batch_size=opt.n_samples,
-                                                        shape=shape,
-                                                        verbose=False,
-                                                        unconditional_guidance_scale=opt.scale,
-                                                        unconditional_conditioning=uc,
-                                                        eta=opt.ddim_eta,
-                                                        order=opt.dpm_order,
-                                                        x_T=[samples_orig, samples.clone(), samples_for_cross, samples_ref, samples, init_latent],
-                                                        width=width,
-                                                        height=height,
-                                                        segmentation_map=segmentation_map,
-                                                        param=param,
-                                                        mask=mask,
-                                                        target_height=target_height, 
-                                                        target_width=target_width,
-                                                        center_row_rm=center_row_from_top,
-                                                        center_col_rm=center_col_from_left,
-                                                        tau_a=opt.tau_a,
-                                                        tau_b=opt.tau_b,
                                                         )
                                 
-                            x_samples = model.decode_first_stage(samples)
-                            x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
-                            
-                            T2 = time.time()
-                            print('Running Time: %s s' % ((T2 - T1)))
-                            
-                            for x_sample in x_samples:
-                                x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
-                                img = Image.fromarray(x_sample.astype(np.uint8))
-                                img.save(os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png"))
-                                base_count += 1
+                                z_ref_enc, _ = sampler.sample(steps=opt.dpm_steps,
+                                                            inv_emb=inv_emb,
+                                                            unconditional_conditioning=uc,
+                                                            conditioning=c,
+                                                            batch_size=opt.n_samples,
+                                                            shape=shape,
+                                                            verbose=False,
+                                                            unconditional_guidance_scale=opt.scale,
+                                                            eta=opt.ddim_eta,
+                                                            order=opt.dpm_order,
+                                                            x_T=ref_latent,
+                                                            DPMencode=True,
+                                                            width=width,
+                                                            height=height,
+                                                            ref=True,
+                                                            )
+                                
+                                samples_orig = z_enc.clone()
+
+                                # inpainting in XOR region of M_seg and M_mask
+                                z_enc[:, :, param[0]:param[1], param[2]:param[3]] \
+                                    = z_enc[:, :, param[0]:param[1], param[2]:param[3]] \
+                                    * segmentation_map[:, :, top_rr:bottom_rr, left_rr:right_rr] \
+                                    + torch.randn((1, 4, bottom_rr - top_rr, right_rr - left_rr), device=device) \
+                                    * (1 - segmentation_map[:, :, top_rr:bottom_rr, left_rr:right_rr])
+
+                                samples_for_cross = samples_orig.clone()
+                                samples_ref = z_ref_enc.clone()
+                                samples = z_enc.clone()
+
+                                # noise composition
+                                if opt.domain == 'cross': 
+                                    samples[:, :, param[0]:param[1], param[2]:param[3]] = torch.randn((1, 4, bottom_rr - top_rr, right_rr - left_rr), device=device) 
+                                    # apply the segmentation mask on the noise
+                                    samples[:, :, param[0]:param[1], param[2]:param[3]] \
+                                            = samples[:, :, param[0]:param[1], param[2]:param[3]].clone() \
+                                            * (1 - segmentation_map[:, :, top_rr: bottom_rr, left_rr: right_rr]) \
+                                            + z_ref_enc[:, :, top_rr: bottom_rr, left_rr: right_rr].clone() \
+                                            * segmentation_map[:, :, top_rr: bottom_rr, left_rr: right_rr]
+                                
+                                mask = torch.zeros_like(z_enc, device=device)
+                                mask[:, :, param[0]:param[1], param[2]:param[3]] = 1
+                                                    
+                                samples, _ = sampler.sample(steps=opt.dpm_steps,
+                                                            inv_emb=inv_emb,
+                                                            conditioning=c,
+                                                            batch_size=opt.n_samples,
+                                                            shape=shape,
+                                                            verbose=False,
+                                                            unconditional_guidance_scale=opt.scale,
+                                                            unconditional_conditioning=uc,
+                                                            eta=opt.ddim_eta,
+                                                            order=opt.dpm_order,
+                                                            x_T=[samples_orig, samples.clone(), samples_for_cross, samples_ref, samples, init_latent],
+                                                            width=width,
+                                                            height=height,
+                                                            segmentation_map=segmentation_map,
+                                                            param=param,
+                                                            mask=mask,
+                                                            target_height=target_height, 
+                                                            target_width=target_width,
+                                                            center_row_rm=center_row_from_top,
+                                                            center_col_rm=center_col_from_left,
+                                                            tau_a=opt.tau_a,
+                                                            tau_b=opt.tau_b,
+                                                            )
+                                    
+                                x_samples = model.decode_first_stage(samples)
+                                x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
+                                
+                                T2 = time.time()
+                                print('Running Time: %s s' % ((T2 - T1)))
+                                
+                                for x_sample in x_samples:
+                                    x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
+                                    img = Image.fromarray(x_sample.astype(np.uint8))
+                                    if mask == opt.mask[-1]:
+                                        img.save(os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png"))
+                                    else: 
+                                        img.save(os.path.join(subdir, '%s.png' % opt.init_img.split('/')[-1]))
+                                    base_count += 1
 
                 del x_samples, samples, z_enc, z_ref_enc, samples_orig, samples_for_cross, samples_ref, mask, x_sample, img, c, uc, inv_emb
                 del param, segmentation_map, top_rr, bottom_rr, left_rr, right_rr, target_height, target_width, center_row_rm, center_col_rm
