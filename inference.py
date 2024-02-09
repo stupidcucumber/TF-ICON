@@ -336,9 +336,11 @@ def main():
                                     x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
                                     img = Image.fromarray(x_sample.astype(np.uint8))
                                     if mask == opt.mask[-1]:
-                                        img.save(os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png"))
+                                        path = os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png")
+                                        print('Saving the final file: ', path)
+                                        img.save(path)
                                     else: 
-                                        path = os.path.join(subdir, '%s.png' % opt.init_img.split('/')[-1])
+                                        path = os.path.join(subdir, '%s' % opt.init_img.split('/')[-1])
                                         print('Path to the sample: ', path)
                                         img.save(path)
                                     base_count += 1
