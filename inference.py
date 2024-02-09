@@ -338,7 +338,9 @@ def main():
                                     if mask == opt.mask[-1]:
                                         img.save(os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png"))
                                     else: 
-                                        img.save(os.path.join(subdir, '%s.png' % opt.init_img.split('/')[-1]))
+                                        path = os.path.join(subdir, '%s.png' % opt.init_img.split('/')[-1])
+                                        print('Path to the sample: ', path)
+                                        img.save(path)
                                     base_count += 1
 
                 del x_samples, samples, z_enc, z_ref_enc, samples_orig, samples_for_cross, samples_ref, mask, x_sample, img, c, uc, inv_emb
