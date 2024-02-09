@@ -332,10 +332,10 @@ def main():
                                 T2 = time.time()
                                 print('Running Time: %s s' % ((T2 - T1)))
                                 
-                                for x_sample in x_samples:
+                                for index, x_sample in enumerate(x_samples):
                                     x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
                                     img = Image.fromarray(x_sample.astype(np.uint8))
-                                    if mask == opt.mask[-1]:
+                                    if index == len(x_samples) - 1:
                                         path = os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png")
                                         print('Saving the final file: ', path)
                                         img.save(path)
