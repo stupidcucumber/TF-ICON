@@ -338,7 +338,9 @@ def main():
 
                                     path = os.path.join(subdir, '%s' % opt.init_img.split('/')[-1])
                                     print('Path to the sample: ', path)
+                                    temp_path = os.path.join(subdir, 'temp_%d.png' % base_count)
                                     img.save(path)
+                                    img.save(temp_path)
                                     base_count += 1
                 
                 path = os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png")
