@@ -15,6 +15,12 @@ services:
               capabilities: [gpu]
 
 volumes:
+  inputs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "$PWD/inputs"
   outputs:
     driver: local
     driver_opts:
