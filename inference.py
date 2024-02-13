@@ -338,7 +338,7 @@ def main():
                                     img = Image.fromarray(x_sample.astype(np.uint8))
 
                                     path = os.path.join(subdir, '%s' % opt.init_img.split('/')[-1])
-                                    print('Path to the sample: ', path)
+                                    print('Path to the sample: ', path, flush=True)
                                     temp_path = os.path.join(subdir, 'temp_%s.png' % datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                                     img.save(path)
                                     img.save(temp_path)
