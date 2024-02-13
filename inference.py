@@ -10,6 +10,7 @@ from contextlib import nullcontext
 from pytorch_lightning import seed_everything
 import cv2
 import time
+from datetime import datetime
 from ldm.util import instantiate_from_config, load_img, load_model_and_get_prompt_embedding, load_model_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 from ldm.models.diffusion.dpm_solver import DPMSolverSampler
@@ -338,7 +339,7 @@ def main():
 
                                     path = os.path.join(subdir, '%s' % opt.init_img.split('/')[-1])
                                     print('Path to the sample: ', path)
-                                    temp_path = os.path.join(subdir, 'temp_%d.png' % base_count)
+                                    temp_path = os.path.join(subdir, 'temp_%s.png' % datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                                     img.save(path)
                                     img.save(temp_path)
                                     base_count += 1
