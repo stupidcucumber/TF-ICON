@@ -112,10 +112,10 @@ def main():
         for file in files:
             torch.cuda.empty_cache()
             file_path = os.path.join(subdir, file)
-            print('Start processing file: ',file_path)
+            print('Start processing file: ',file_path, flush=True)
             result = re.search(r'./inputs/[^/]+/(.+)/bg\d+\.', file_path)
             if result:
-                prompt = result.group(1)
+                prompt = 'tomato on a plant, photorealistic'
                 
             if file_path.endswith('.jpg') or file_path.endswith('.jpeg') or file_path.endswith('.png'):
                 if file.startswith('bg'):
@@ -201,12 +201,12 @@ def main():
 
                     image = Image.fromarray(((save_image/torch.max(save_image.max(), abs(save_image.min())) + 1) * 127.5)[0].permute(1,2,0).to(dtype=torch.uint8).cpu().numpy())
                     image.save('./outputs/cp_bg_fg.jpg')
-                    print('Saved pre-processed image.')
+                    print('Saved pre-processed image.', flush=True)
 
                     precision_scope = autocast if opt.precision == "autocast" else nullcontext
                     
                     # image composition
-                    print('Starting image composition...')
+                    print('Starting image composition...', flush=True)
                     with torch.no_grad():
                         with precision_scope("cuda"):
                             for prompts in data:
@@ -331,7 +331,7 @@ def main():
                                 x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
                                 
                                 T2 = time.time()
-                                print('Running Time: %s s' % ((T2 - T1)))
+                                print('Running Time: %s s' % ((T2 - T1)), flush=True)
                                 
                                 for x_sample in x_samples:
                                     x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
@@ -345,8 +345,9 @@ def main():
                                     base_count += 1
                 
                 path = os.path.join(sample_path, f"{base_count:05}_{prompts[0]}.png")
-                print('Saving the final file: ', path)
+                print('Saving the final file: ', path, flush=True)
                 img.save(path)
+                opt.mask.clear()
 
                 del x_samples, samples, z_enc, z_ref_enc, samples_orig, samples_for_cross, samples_ref, mask, x_sample, img, c, uc, inv_emb
                 del param, segmentation_map, top_rr, bottom_rr, left_rr, right_rr, target_height, target_width, center_row_rm, center_col_rm
