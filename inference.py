@@ -72,7 +72,6 @@ def parse_arguments():
 
     return opt
 
-
 def main():
     print('Welcome to the inference script! In a moment we will start...')
     opt = parse_arguments()

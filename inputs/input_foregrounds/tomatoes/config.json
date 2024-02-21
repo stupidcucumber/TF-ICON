@@ -3,17 +3,25 @@
         "image": "inputs/input_foregrounds/tomatoes/image/red_tomato_0.png",
         "mask": "inputs/input_foregrounds/tomatoes/mask/red_tomato_0.png",
         "weight": 100.0
-    },
+    },    
     {
-
-    },
+        "image": "inputs/input_foregrounds/tomatoes/image/red_tomato_1.png",
+        "mask": "inputs/input_foregrounds/tomatoes/mask/red_tomato_1.png",
+        "weight": 100.0
+    },    
     {
-
-    },
+        "image": "inputs/input_foregrounds/tomatoes/image/red_tomato_2.png",
+        "mask": "inputs/input_foregrounds/tomatoes/mask/red_tomato_2.png",
+        "weight": 100.0
+    },    
     {
-
-    },
+        "image": "inputs/input_foregrounds/tomatoes/image/green_tomato_0.png",
+        "mask": "inputs/input_foregrounds/tomatoes/mask/green_tomato_0.png",
+        "weight": 50.0
+    },    
     {
-
+        "image": "inputs/input_foregrounds/tomatoes/image/green_tomato_1.png",
+        "mask": "inputs/input_foregrounds/tomatoes/mask/green_tomato_1.png",
+        "weight": 50.0
     }
 ]
