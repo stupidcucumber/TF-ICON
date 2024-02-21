@@ -128,12 +128,8 @@ def main():
             if file_path.endswith('.jpg') or file_path.endswith('.jpeg') or file_path.endswith('.png'):
                 if file.startswith('bg'):
                     opt.init_img = file_path
-                elif file.startswith('fg') and not (file.endswith('mask.jpg') or file.endswith('mask.png')):
-                    opt.ref_img = file_path
                 elif file.startswith('mask'):
                     opt.mask.append(file_path)
-                elif file.startswith('fg') and (file.endswith('mask.jpg') or file.endswith('mask.png')):
-                    opt.seg = file_path
                     
             if file == files[-1]:
                 seed_everything(opt.seed)
