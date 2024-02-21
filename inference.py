@@ -1,6 +1,6 @@
 import argparse, os
 import torch
-import re
+import re, json
 import numpy as np
 from omegaconf import OmegaConf
 from PIL import Image
@@ -66,17 +66,26 @@ def parse_arguments():
       
     parser.add_argument("--tau_b", type=float, help="", default=0.8)
           
-    parser.add_argument("--gpu", type=str, help="", default='cuda:0') 
+    parser.add_argument("--gpu", type=str, help="", default='cuda:0')
+
+    parser.add_argument('--masks', type=str, help='Path to the json file containing masks.')
     
     opt = parser.parse_args()
 
     return opt
+
+def choose_mask(config: dict) -> list[str, str]:
+    decision = np.random.choice(config)
+    return decision['image'], decision['mask']
 
 def main():
     print('Welcome to the inference script! In a moment we will start...')
     opt = parse_arguments()
     opt.mask = []
     output_folder = 'outputs'
+
+    with open(opt.masks, 'r') as config_f:
+        masks_config = json.load(config_f)
 
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
@@ -130,6 +139,7 @@ def main():
                 seed_everything(opt.seed)
 
                 for mask in opt.mask:
+                    opt.ref_image, opt.seg = choose_mask(config=masks_config)
                     img = cv2.imread(mask, 0)
                     # Threshold the image to create binary image
                     _, binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
