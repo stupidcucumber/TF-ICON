@@ -4,7 +4,6 @@ import ptp_scripts.ptp_scripts as ptp
 import ptp_scripts.ptp_utils as ptp_utils
 # from .dpm_solver import NoiseScheduleVP, model_wrapper, DPM_Solver
 from scripts.dpm_solver_pytorch import NoiseScheduleVP, model_wrapper, DPM_Solver
-from tqdm import tqdm
 
 MODEL_TYPES = {
     "eps": "noise",

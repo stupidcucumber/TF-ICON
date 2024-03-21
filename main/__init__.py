@@ -1,16 +1,12 @@
-from setuptools import setup, find_packages
-requirements = []
-with open('requirements.txt', 'r') as f:
-    for line in f.readlines():
-        requirements.append(line.strip())
+from setuptools import find_packages, setup
 
 with open('README.md') as desc_f:
     long_description = desc_f.read()
 
 setup(
-    name='tficon',
+    name='tf-icon',
     version='0.0.10',
-    description='Packaged TF-ICON.',
+    description='Package for easy printing and logging to the terminal/console.',
     package_dir={'': 'main'},
     packages=find_packages('main'),
     long_description=long_description,
@@ -24,7 +20,7 @@ setup(
         'Programming Language :: Python :: 3.10',
         'Operating System :: OS Independent'
     ],
-    install_requires=requirements,
+    install_requires=[],
     extras_require={
         'dev' : ['twine>=4.0.2']
     },

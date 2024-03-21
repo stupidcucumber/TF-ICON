@@ -6,9 +6,6 @@
 # https://github.com/openai/guided-diffusion/blob/0ba878e517b276c45d1195eb29f6f5f72659a05b/guided_diffusion/nn.py
 #
 # thanks!
-
-
-import os
 import math
 import torch
 import torch.nn as nn

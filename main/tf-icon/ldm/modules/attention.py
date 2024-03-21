@@ -5,10 +5,7 @@ import torch.nn.functional as F
 from torch import nn, einsum
 from einops import rearrange, repeat
 from typing import Optional, Any
-import matplotlib.pyplot as plt
-import numpy as np
 from ldm.modules.diffusionmodules.util import checkpoint
-from PIL import Image
 
 try:
     import xformers

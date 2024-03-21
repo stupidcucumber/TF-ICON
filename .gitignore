@@ -2,4 +2,6 @@ inputs/same_domain/*
 outputs/*
 **/*.ipynb
 **/__pycache__
-**/.DS_Store
+**/.DS_Store]
+build/
+**/*.egg-info

@@ -5,8 +5,7 @@ from torch.utils.checkpoint import checkpoint
 from transformers import T5Tokenizer, T5EncoderModel, CLIPTokenizer, CLIPTextModel
 
 import open_clip
-from ldm.util import default, count_params
-import einops
+from ldm.util import count_params
 
 class AbstractEncoder(nn.Module):
     def __init__(self):
@@ -17,7 +16,6 @@ class AbstractEncoder(nn.Module):
 
 
 class IdentityEncoder(AbstractEncoder):
-
     def encode(self, x):
         return x
 
