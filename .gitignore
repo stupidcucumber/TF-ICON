@@ -1,3 +1,5 @@
 inputs/same_domain/*
 outputs/*
 **/*.ipynb
+**/__pycache__
+**/.DS_Store
