@@ -14,13 +14,12 @@
 
 import numpy as np
 import torch
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 import cv2
-from typing import Optional, Union, Tuple, List, Callable, Dict
+from typing import Optional, Union, Tuple, List, Dict
 from IPython.display import display
 from tqdm.notebook import tqdm
-import matplotlib.pyplot as plt
-from torch import nn, einsum
+from torch import einsum
 from einops import rearrange, repeat
 from inspect import isfunction
 
