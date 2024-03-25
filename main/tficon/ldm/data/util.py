@@ -1,5 +1,5 @@
 import torch
-from main.tficon.ldm.modules.midas.api import load_midas_transform
+from tficon.ldm.modules.midas.api import load_midas_transform
 
 
 class AddMiDaS(object):

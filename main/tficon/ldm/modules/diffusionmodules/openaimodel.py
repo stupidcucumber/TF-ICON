@@ -6,7 +6,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from main.tficon.ldm.modules.diffusionmodules.util import (
+from tficon.ldm.modules.diffusionmodules.util import (
     checkpoint,
     conv_nd,
     linear,
@@ -15,8 +15,8 @@ from main.tficon.ldm.modules.diffusionmodules.util import (
     normalization,
     timestep_embedding,
 )
-from main.tficon.ldm.modules.attention import SpatialTransformer
-from main.tficon.ldm.util import exists
+from tficon.ldm.modules.attention import SpatialTransformer
+from tficon.ldm.util import exists
 
 
 # dummy replace

@@ -1,8 +1,7 @@
 """SAMPLING ONLY."""
 import torch
-import main.tficon.ptp_scripts.ptp_scripts as ptp
-import main.tficon.ptp_scripts.ptp_utils as ptp_utils
-# from .dpm_solver import NoiseScheduleVP, model_wrapper, DPM_Solver
+import tficon.ptp_scripts.ptp_scripts as ptp
+import tficon.ptp_scripts.ptp_utils as ptp_utils
 from .dpm_solver import NoiseScheduleVP, model_wrapper, DPM_Solver
 
 MODEL_TYPES = {

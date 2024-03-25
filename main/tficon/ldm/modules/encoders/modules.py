@@ -5,7 +5,7 @@ from torch.utils.checkpoint import checkpoint
 from transformers import T5Tokenizer, T5EncoderModel, CLIPTokenizer, CLIPTextModel
 
 import open_clip
-from main.tficon.ldm.util import count_params
+from tficon.ldm.util import count_params
 
 class AbstractEncoder(nn.Module):
     def __init__(self):

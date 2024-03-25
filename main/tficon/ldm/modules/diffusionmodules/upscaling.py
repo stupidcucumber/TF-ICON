@@ -3,8 +3,8 @@ import torch.nn as nn
 import numpy as np
 from functools import partial
 
-from main.tficon.ldm.modules.diffusionmodules.util import extract_into_tensor, make_beta_schedule
-from main.tficon.ldm.util import default
+from tficon.ldm.modules.diffusionmodules.util import extract_into_tensor, make_beta_schedule
+from tficon.ldm.util import default
 
 
 class AbstractLowScaleModel(nn.Module):
