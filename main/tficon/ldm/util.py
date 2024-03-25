@@ -53,11 +53,11 @@ def load_model_from_config(config, ckpt, gpu, verbose=False):
     return model
 
 
-def load_img(path, SCALE, pad=False, seg=False, target_size=None):
+def process_img(raw_image: Image.Image, SCALE, pad=False, seg: Image.Image | None = None, target_size=None):
     if seg:
         # Load the input image and segmentation map
-        image = Image.open(path).convert("RGB")
-        seg_map = Image.open(seg).convert("1")
+        image = raw_image.convert("RGB")
+        seg_map = seg.convert("1")
 
         # Get the width and height of the original image
         w, h = image.size
@@ -92,9 +92,8 @@ def load_img(path, SCALE, pad=False, seg=False, target_size=None):
         # Update the variable "image" to contain the final padded image
         image = padded_image
     else:
-        image = Image.open(path).convert("RGB")
-        w, h = image.size        
-        print(f"loaded input image of size ({w}, {h}) from {path}")
+        image = raw_image.convert("RGB")
+        w, h = image.size
         w, h = map(lambda x: x - x % 64, (w, h))  # resize to integer multiple of 64
         w = h = 512
         image = image.resize((w, h), resample=PIL.Image.LANCZOS)

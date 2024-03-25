@@ -2,7 +2,7 @@ from .util import (
     load_model_and_get_prompt_embedding,
     chunk,
     load_model_from_config,
-    load_img,
+    process_img,
     log_txt_as_img,
     ismap,
     isimage,
