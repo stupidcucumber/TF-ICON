@@ -1,5 +1,5 @@
 from .util import (
-    load_model_and_get_prompt_embedding,
+    load_prompt_embedding,
     chunk,
     load_model_from_config,
     process_img,

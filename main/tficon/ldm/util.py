@@ -11,20 +11,18 @@ from inspect import isfunction
 from PIL import Image, ImageDraw, ImageFont
 
 
-def load_model_and_get_prompt_embedding(model, opt, prompts, inv: bool=True):
-           
+def load_prompt_embedding(model, scale: float, n_samples: int, prompts, inv: bool=True):
     if inv:
         inv_emb = model.get_learned_conditioning(prompts, inv)
         c = uc = inv_emb
     else:
         inv_emb = None
         
-    if opt.scale != 1.0:
-        uc = model.get_learned_conditioning(opt.n_samples * [""])
+    if scale != 1.0:
+        uc = model.get_learned_conditioning(n_samples * [''])
     else:
         uc = None
     c = model.get_learned_conditioning(prompts)
-        
     return c, uc, inv_emb
     
     
