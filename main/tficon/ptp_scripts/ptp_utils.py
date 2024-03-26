@@ -224,7 +224,6 @@ def register_attention_control(model, controller, center_row_rm, center_col_rm, 
             center_col = int(center_col_rm * main_width)
             
             if pseudo_cross:
-                print('X shape: ', x.shape, flush=True)
                 ref_init = rearrange(x[2], '(h w) c ->1 c h w', h=main_height).contiguous()
                 context = ref_init[:, :, top_rr:bottom_rr, left_rr:right_rr]
                 
