@@ -11,9 +11,9 @@ from pytorch_lightning import seed_everything
 import cv2
 import time
 from datetime import datetime
-from ldm.util import instantiate_from_config, load_img, load_model_and_get_prompt_embedding, load_model_from_config
-from ldm.models.diffusion.ddim import DDIMSampler
-from ldm.models.diffusion.dpm_solver import DPMSolverSampler
+from main.tficon.ldm.util import instantiate_from_config, process_img, load_prompt_embedding, load_model_from_config
+from main.tficon.ldm.models.diffusion.ddim import DDIMSampler
+from main.tficon.ldm.models.diffusion.dpm_solver import DPMSolverSampler
 from huggingface_hub import hf_hub_download
 
 
@@ -168,12 +168,12 @@ def main():
                     
                     # read background image              
                     assert os.path.isfile(opt.init_img)
-                    init_image, target_width, target_height = load_img(opt.init_img, scale)
+                    init_image, target_width, target_height = process_img(opt.init_img, scale)
                     init_image = repeat(init_image.to(device), '1 ... -> b ...', b=batch_size)
                     save_image = init_image.clone()
 
                     # read foreground image and its segmentation map
-                    ref_image, width, height, segmentation_map  = load_img(opt.ref_img, scale, seg=opt.seg, target_size=(target_width, target_height))
+                    ref_image, width, height, segmentation_map  = process_img(opt.ref_img, scale, seg=opt.seg, target_size=(target_width, target_height))
                     ref_image = repeat(ref_image.to(device), '1 ... -> b ...', b=batch_size)
 
                     segmentation_map_orig = repeat(torch.tensor(segmentation_map)[None, None, ...].to(device), '1 1 ... -> b 4 ...', b=batch_size)
@@ -216,7 +216,7 @@ def main():
                         with precision_scope("cuda"):
                             for prompts in data:
                                 print(prompts)
-                                c, uc, inv_emb = load_model_and_get_prompt_embedding(model, opt, prompts, inv=True)
+                                c, uc, inv_emb = load_prompt_embedding(model, opt, prompts, inv=True)
                                 
                                 if opt.domain == 'same': # same domain
                                     init_image = save_image
